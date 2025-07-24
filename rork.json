@@ -1,0 +1,7 @@
+{
+  "backend": {
+    "enabled": true,
+    "entry": "./backend/hono.ts",
+    "mount": "/api"
+  }
+}
