@@ -2,7 +2,6 @@ import React, { useState } from 'react';
 import { StyleSheet, View, Text, TextInput, TouchableOpacity, Alert } from 'react-native';
 import { router } from 'expo-router';
 import { Mail, Lock, ArrowLeft } from 'lucide-react-native';
-import { supabase } from '@/lib/supabase';
 import { trpc } from '@/lib/trpc';
 
 export default function SignUpScreen() {
@@ -52,120 +51,43 @@ export default function SignUpScreen() {
     setIsLoading(true);
     
     try {
-      // Step 1: Sign up user with Supabase Auth
-      const { data: authData, error: authError } = await supabase.auth.signUp({
-        email: email.toLowerCase().trim(),
-        password: password,
-        options: {
-          emailRedirectTo: undefined, // We'll handle email verification manually
-          data: {
-            email: email.toLowerCase().trim(),
-          }
-        }
-      });
-
-      if (authError) {
-        console.error('Supabase Auth Error:', authError);
-        
-        // Handle specific error cases
-        if (authError.message.includes('already registered')) {
-          Alert.alert('Account Exists', 'An account with this email already exists. Please sign in instead.');
-          return;
-        }
-        
-        Alert.alert('Sign Up Error', authError.message || 'Failed to create account. Please try again.');
-        return;
+      const result = await sendOtpMutation.mutateAsync({ email });
+      
+      if (result.demoCode) {
+        Alert.alert(
+          'Demo Mode', 
+          `Verification code: ${result.demoCode}\n\nIn demo mode, you can also use: 123456`,
+          [
+            {
+              text: 'Continue',
+              onPress: () => router.push({
+                pathname: '/email-verification',
+                params: { email, password }
+              })
+            }
+          ]
+        );
+      } else {
+        router.push({
+          pathname: '/email-verification',
+          params: { email, password }
+        });
       }
-
-      // Step 2: Check if user was created successfully
-      // if (authData.user) {
-      //   console.log('User created successfully:', authData.user.id);
-
-      //   // Step 3: Save additional user data to custom users table (optional)
-      //   try {
-      //     const { error: dbError } = await supabase
-      //       .from('users') // You can name this table 'users' or 'profiles'
-      //       .insert([
-      //         {
-      //           id: authData.user.id,
-      //           email: email.toLowerCase().trim(),
-      //           created_at: new Date().toISOString(),
-      //           // email_verified: false,
-      //           // onboarding_completed: false,
-      //           // Add other default fields as needed
-      //         }
-      //       ]);
-
-      //     if (dbError) {
-      //       console.error('Database Error:', dbError);
-      //       // Continue anyway, as the auth user was created successfully
-      //     } else {
-      //       console.log('User profile created successfully');
-      //     }
-      //   } catch (profileError) {
-      //     console.error('Profile creation error:', profileError);
-      //     // Continue anyway
-      //   }
-
-      //   // Step 4: Send OTP for email verification
-      //   try {
-      //     const result = await sendOtpMutation.mutateAsync({ email });
-          
-      //     if (result.demoCode) {
-      //       Alert.alert(
-      //         'Demo Mode', 
-      //         `Verification code: ${result.demoCode}\n\nIn demo mode, you can also use: 123456`,
-      //         [
-      //           {
-      //             text: 'Continue',
-      //             onPress: () => router.push({
-      //               pathname: '/email-verification',
-      //               params: { 
-      //                 email, 
-      //                 password,
-      //                 userId: authData.user?.id
-      //               }
-      //             })
-      //           }
-      //         ]
-      //       );
-      //     } else {
-      //       // Navigate to email verification screen
-      //       router.push({
-      //         pathname: '/email-verification',
-      //         params: { 
-      //           email, 
-      //           password,
-      //           userId: authData.user.id
-      //         }
-      //       });
-      //     }
-      //   } catch (otpError) {
-      //     console.error('OTP Error:', otpError);
-      //     Alert.alert(
-      //       'Demo Mode', 
-      //       'Email verification is in demo mode. Use code: 123456',
-      //       [
-      //         {
-      //           text: 'Continue',
-      //           onPress: () => router.push({
-      //             pathname: '/email-verification',
-      //             params: { 
-      //               email, 
-      //               password,
-      //               userId: authData.user?.id
-      //             }
-      //           })
-      //         }
-      //       ]
-      //     );
-      //   }
-      // } else {
-      //   Alert.alert('Error', 'Failed to create user account. Please try again.');
-      // }
     } catch (error) {
-      console.error('Unexpected Error:', error);
-      Alert.alert('Error', 'An unexpected error occurred. Please try again.');
+      console.error('OTP Error:', error);
+      Alert.alert(
+        'Demo Mode', 
+        'Email verification is in demo mode. Use code: 123456',
+        [
+          {
+            text: 'Continue',
+            onPress: () => router.push({
+              pathname: '/email-verification',
+              params: { email, password }
+            })
+          }
+        ]
+      );
     } finally {
       setIsLoading(false);
     }
@@ -194,7 +116,6 @@ export default function SignUpScreen() {
               placeholder="Email Address"
               keyboardType="email-address"
               autoCapitalize="none"
-              autoCorrect={false}
               testID="email-input"
             />
           </View>
@@ -207,8 +128,6 @@ export default function SignUpScreen() {
               onChangeText={setPassword}
               placeholder="Password (min 6 characters)"
               secureTextEntry
-              autoCapitalize="none"
-              autoCorrect={false}
               testID="password-input"
             />
           </View>
@@ -220,7 +139,7 @@ export default function SignUpScreen() {
             testID="email-sign-up-button"
           >
             <Text style={styles.signUpButtonText}>
-              {isLoading ? 'Creating Account...' : 'Continue with Email'}
+              {isLoading ? 'Sending...' : 'Continue with Email'}
             </Text>
           </TouchableOpacity>
         </View>
